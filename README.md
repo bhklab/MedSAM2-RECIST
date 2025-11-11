@@ -3,6 +3,25 @@
 Docker-based MedSAM2 inference pipeline for MICCAI FLARE25 Task1-PancancerRECIST-to-3D. 
 This repository supports these baselines: MedSAM2 and Efficient MedSAM2 Small/Tiny.
 
+## Setting up Pixi environment
+
+- Clone the `pixi-efficient-tiny` branch
+
+- Install the pixi environment
+```bash
+pixi install
+```
+- Download the Efficient MedSAM2 Tiny checkpoint - will save in checkpoints directory
+```bash
+sh download_EfficientMedSAM2_Tiny.sh
+```
+- Confirm setup is functioning by running example case
+```bash
+python3 eff_medsam2_infer_CT_lesion_npz_recist_local.py \
+    --checkpoint tiny \
+    --imgs_path data/validation_public_npz \
+    --pred_save_dir data/out
+```
 
 ## Building Docker
 
