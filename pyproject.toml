@@ -18,21 +18,21 @@ opencv-python = ">=4.10.0,<5"
 args = ["dataset"]
 cmd = ["python3", "medsam2_infer_CT_lesion_npz_recist.py",
        "--imgs_path", "data/procdata/{{ dataset }}/images/npz_{{ dataset }}",
-       "--pred_save_dir", "data/results/{{ dataset }}/MedSAM2-RECIST/predictions/medsam2"]
+       "--pred_save_dir", "data/results/{{ dataset }}/predictions/medsam2"]
 
 [tool.pixi.tasks.predict-eff-small]
 args = ["dataset"]
 cmd = ["python3", "eff_medsam2_infer_CT_lesion_npz_recist_local.py",
        "--checkpoint", "small",
        "--imgs_path", "data/procdata/{{ dataset }}/images/npz_{{ dataset }}",
-       "--pred_save_dir", "data/results/{{ dataset }}/MedSAM2-RECIST/predictions/eff-small"]
+       "--pred_save_dir", "data/results/{{ dataset }}/predictions/eff-small"]
 
 [tool.pixi.tasks.predict-eff-tiny]
 args = ["dataset"]
 cmd = ["python3", "eff_medsam2_infer_CT_lesion_npz_recist_local.py",
        "--checkpoint", "tiny",
        "--imgs_path", "data/procdata/{{ dataset }}/images/npz_{{ dataset }}",
-       "--pred_save_dir", "data/results/{{ dataset }}/MedSAM2-RECIST/predictions/eff-tiny"]
+       "--pred_save_dir", "data/results/{{ dataset }}/predictions/eff-tiny"]
 
 
 [tool.pixi.dependencies]
