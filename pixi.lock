@@ -2968,7 +2968,7 @@ packages:
 - pypi: ./
   name: medsam2
   version: '1.0'
-  sha256: 6daf4b0f203c9afdc2067fc127693f4cbd33b98917efd6d033d10b6451692225
+  sha256: a909fe091da1e8c3b317165798958b2b764368cddab32c941411e240576eab91
   requires_dist:
   - torch>=2.5.1
   - torchvision>=0.20.1
