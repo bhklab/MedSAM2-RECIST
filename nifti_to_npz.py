@@ -3,7 +3,9 @@ import numpy as np
 from pathlib import Path
 import pandas as pd
 from skimage.draw import line
-# from joblib import Parallel, delayed
+from joblib import Parallel, delayed
+import click
+from tqdm import tqdm
 
 
 def apply_windowing(img_array: np.ndarray,
@@ -182,8 +184,8 @@ def get_line_from_recist(recist_coords: np.array,
 def nifti_to_medsam_npz(image_path: Path,
                         mask_path: Path,
                         npz_path: Path,
-                        window_level: int = None,
-                        window_width: int = None) -> None:
+                        window_level: int = 0,
+                        window_width: int = -1) -> None:
     '''
     Convert a NIfTI image to a NumPy NPZ file after applying windowing.
 
@@ -207,7 +209,7 @@ def nifti_to_medsam_npz(image_path: Path,
     image_array = sitk.GetArrayFromImage(nifti_image)
 
     # Apply windowing to the image only
-    if window_level is not None and window_width is not None:
+    if window_width != -1:
         image_array = apply_windowing(image_array, window_level, window_width)
     
     spacing = nifti_image.GetSpacing()
@@ -265,11 +267,55 @@ def insert_SampleID(dataset_index:pd.DataFrame) -> pd.DataFrame:
     return dataset_index
 
 
+def process_one_sample(sample_metadata: str,
+                       image_path: Path,
+                       out_path: Path,
+                       window_level: int = 0,
+                       window_width: int = -1
+                       ):
+    sample_id = sample_metadata['SampleID'].values[0]
+    img_metadata = sample_metadata[sample_metadata['class'] == 'Scan']
+    mask_metadata = sample_metadata[sample_metadata['class'] == 'Mask']
 
+    nifti_to_medsam_npz(image_path = image_path / img_metadata['filepath'].values[0],
+                        mask_path = image_path / mask_metadata['filepath'].values[0],
+                        npz_path = out_path / f"{sample_id}.npz",
+                        window_level = window_level,
+                        window_width = window_width)
+
+
+
+@click.command()
+@click.argument('image_path', type=click.Path(exists=True, readable=True))
+@click.argument('out_path', type=click.Path())
+@click.option('--window_level', type=click.INT, default = 0, help="Level to use if windowing is to be applied to the images.")
+@click.option('--window_width', type=click.INT, default = -1, help="Width to use if windowing is to be applied to the images. If set to -1, no windowing will be applied.")
+@click.option('--parallel', type=click.BOOL, default = False, help="Whether to run the conversion in parallel.")
 def process_mit_images(image_path: Path,
                        out_path: Path,
-                       window_level: int = 40,
-                       window_width: int = 400):
+                       window_level: int = 0,
+                       window_width: int = -1,
+                       parallel: bool = False):
+    """Process images in a Med-ImageTools autopipeline index-simple file to convert to npz
+    Parameters
+    ----------
+    image_path: Path
+        Path to directory containing MIT index and sample directories 
+    out_path: Path
+        Path to save the npz files to.
+    window_level: int = 0
+        Level to use if windowing is to be applied to the images.
+    window_width: int = -1
+        Width to use if windowing is to be applied to the images. If set to -1, no windowing will be applied.
+    parallel: bool = False
+        Whether to run the image conversion in parallel.
+    """
+    if isinstance(image_path, str):
+        image_path = Path(image_path)
+
+    if isinstance(out_path, str):
+        out_path = Path(out_path)
+
     # load mit index file
     mit_index_df = pd.read_csv(image_path / f"{image_path.stem}_index-simple.csv")
 
@@ -278,23 +324,35 @@ def process_mit_images(image_path: Path,
 
     sample_ids = sorted(mit_index_df['SampleID'].unique())
 
-    for sample_id in sample_ids:
-        print(sample_id)
-        sample_metadata = mit_index_df[mit_index_df['SampleID'] == sample_id]
+    if parallel:
+        Parallel()(
+            delayed(process_one_sample)(
+                sample_metadata=mit_index_df[mit_index_df['SampleID'] == sample_id],
+                image_path=image_path,
+                out_path=out_path,
+                window_level=window_level,
+                window_width=window_width
+            )
+            for sample_id in tqdm(
+                sample_ids,
+                desc="Running MedSAM2 inference",
+                total=len(sample_ids)
+            )
+        )
 
-        img_metadata = sample_metadata[sample_metadata['class'] == 'Scan']
-        mask_metadata = sample_metadata[sample_metadata['class'] == 'Mask']
+    else:
+        for sample_id in tqdm(
+            sample_ids,
+            desc="Running MedSAM2 inference",
+            total=len(sample_ids)
+        ):
+            process_one_sample(sample_metadata=mit_index_df[mit_index_df['SampleID'] == sample_id],
+                               image_path=image_path,
+                               out_path=out_path,
+                               window_level=window_level,
+                               window_width=window_width)
 
-        nifti_to_medsam_npz(image_path = image_path / img_metadata['filepath'].values[0],
-                            mask_path = image_path / mask_metadata['filepath'].values[0],
-                            npz_path = out_path / f"{sample_id}.npz",
-                            window_level = window_level,
-                            window_width = window_width)
-
-
-    
 
 
 if __name__ == "__main__":
-    process_mit_images(Path("data/rawdata/TCIA_RADCURE/images/mit_RADCURE_OCSCC"),
-                       Path("data/procdata/TCIA_RADCURE/images/npz_RADCURE_OCSCC"))
+    process_mit_images()
