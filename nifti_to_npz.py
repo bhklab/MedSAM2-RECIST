@@ -273,9 +273,18 @@ def process_one_sample(sample_metadata: str,
                        window_level: int = 0,
                        window_width: int = -1
                        ):
-    sample_id = sample_metadata['SampleID'].values[0]
+    sample_id = sample_metadata['SampleID'].iloc[0]
+
+    
     img_metadata = sample_metadata[sample_metadata['class'] == 'Scan']
+    if img_metadata.empty:
+        print(f"{sample_id} has no Scan metadata. Skipping sample.")
+        return
+    
     mask_metadata = sample_metadata[sample_metadata['class'] == 'Mask']
+    if mask_metadata.empty:
+        print(f"{sample_id} has no Mask metadata. Skipping sample.")
+        return
 
     nifti_to_medsam_npz(image_path = image_path / img_metadata['filepath'].values[0],
                         mask_path = image_path / mask_metadata['filepath'].values[0],
