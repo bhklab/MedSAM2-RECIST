@@ -24,15 +24,19 @@ cmd = ["python3", "medsam2_infer_CT_lesion_npz_recist.py",
 args = ["dataset", "disease_region"]
 cmd = ["python3", "eff_medsam2_infer_CT_lesion_npz_recist_local.py",
        "--checkpoint", "small",
-       "--imgs_path", "data/procdata/{{ disease_region }}/{{ dataset }}/images/npz_{{ dataset }}",
-       "--pred_save_dir", "data/results/{{ disease_region }}/{{ dataset }}/predictions/eff-small"]
+       "--imgs_path", "data/procdata/{{ disease_region }}/{{ dataset }}/images/npz_{{ annotation_type }}_{{ dataset }}",
+       "--pred_save_dir", "data/results/{{ disease_region }}/{{ dataset }}/predictions/eff-small-{{ annotation_type }}",
+       "-save_overlay",
+       "--num_workers", "{{ num_workers }}"]
 
 [tool.pixi.tasks.predict-eff-tiny]
-args = ["dataset", "disease_region"]
+args = ["dataset", "disease_region", "num_workers", {arg = "annotation_type", default = "RERECIST"}]
 cmd = ["python3", "eff_medsam2_infer_CT_lesion_npz_recist_local.py",
        "--checkpoint", "tiny",
-       "--imgs_path", "data/procdata/{{ disease_region }}/{{ dataset }}/images/npz_{{ dataset }}",
-       "--pred_save_dir", "data/results/{{ disease_region }}/{{ dataset }}/predictions/eff-tiny"]
+       "--imgs_path", "data/procdata/{{ disease_region }}/{{ dataset }}/images/npz_{{ annotation_type }}_{{ dataset }}",
+       "--pred_save_dir", "data/results/{{ disease_region }}/{{ dataset }}/predictions/eff-tiny-{{ annotation_type }}",
+       "-save_overlay",
+       "--num_workers", "{{ num_workers }}"]
 
 
 [tool.pixi.dependencies]
