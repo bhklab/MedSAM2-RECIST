@@ -205,7 +205,7 @@ def nifti_to_medsam_npz(image_path: Path,
         Window width for image windowing (default is 400).
     '''
     # Load NIfTI image using SimpleITK
-    nifti_image = sitk.ReadImage(image_path)
+    nifti_image = sitk.ReadImage(image_path, outputPixelType=sitk.sitkInt16)
     image_array = sitk.GetArrayFromImage(nifti_image)
 
     # Apply windowing to the image only
@@ -217,7 +217,7 @@ def nifti_to_medsam_npz(image_path: Path,
     origin = nifti_image.GetOrigin()
 
     # Load NIfTI mask using SimpleITK
-    nifti_mask = sitk.ReadImage(mask_path)
+    nifti_mask = sitk.ReadImage(mask_path, outputPixelType=sitk.sitkUInt8)
     mask_array = sitk.GetArrayFromImage(nifti_mask)
 
     # Make RECIST annotation part of the input 
@@ -274,7 +274,6 @@ def process_one_sample(sample_metadata: str,
                        window_width: int = -1
                        ):
     sample_id = sample_metadata['SampleID'].iloc[0]
-
     
     img_metadata = sample_metadata[sample_metadata['class'] == 'Scan']
     if img_metadata.empty:
@@ -285,10 +284,13 @@ def process_one_sample(sample_metadata: str,
     if mask_metadata.empty:
         print(f"{sample_id} has no Mask metadata. Skipping sample.")
         return
+    mask_path = image_path / mask_metadata['filepath'].values[0]
+    rtstruct_id = Path(mask_path).parent.stem
+    print(rtstruct_id)
 
     nifti_to_medsam_npz(image_path = image_path / img_metadata['filepath'].values[0],
-                        mask_path = image_path / mask_metadata['filepath'].values[0],
-                        npz_path = out_path / f"{sample_id}.npz",
+                        mask_path = mask_path,
+                        npz_path = out_path / f"{sample_id}_{rtstruct_id}.npz",
                         window_level = window_level,
                         window_width = window_width)
 
@@ -344,7 +346,7 @@ def process_mit_images(image_path: Path,
             )
             for sample_id in tqdm(
                 sample_ids,
-                desc="Running MedSAM2 inference",
+                desc="Converting nifti to npz for MedSAM2-RECIST inference",
                 total=len(sample_ids)
             )
         )
@@ -352,7 +354,7 @@ def process_mit_images(image_path: Path,
     else:
         for sample_id in tqdm(
             sample_ids,
-            desc="Running MedSAM2 inference",
+            desc="Converting nifti to npz for MedSAM2-RECIST inference",
             total=len(sample_ids)
         ):
             process_one_sample(sample_metadata=mit_index_df[mit_index_df['SampleID'] == sample_id],
