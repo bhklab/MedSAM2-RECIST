@@ -284,15 +284,15 @@ def process_one_sample(sample_metadata: str,
     if mask_metadata.empty:
         print(f"{sample_id} has no Mask metadata. Skipping sample.")
         return
-    mask_path = image_path / mask_metadata['filepath'].values[0]
-    rtstruct_id = Path(mask_path).parent.stem
-    print(rtstruct_id)
+    for idx, mask in mask_metadata.iterrows():
+        mask_path = image_path / mask['filepath']
+        rtstruct_id = Path(mask_path).parent.stem
 
-    nifti_to_medsam_npz(image_path = image_path / img_metadata['filepath'].values[0],
-                        mask_path = mask_path,
-                        npz_path = out_path / f"{sample_id}_{rtstruct_id}.npz",
-                        window_level = window_level,
-                        window_width = window_width)
+        nifti_to_medsam_npz(image_path = image_path / img_metadata['filepath'].values[0],
+                            mask_path = mask_path,
+                            npz_path = out_path / f"{sample_id}_{rtstruct_id}.npz",
+                            window_level = window_level,
+                            window_width = window_width)
 
 
 
