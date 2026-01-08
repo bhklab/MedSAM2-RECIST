@@ -1,7 +1,6 @@
 [build-system]
 requires = [
     "setuptools>=61.0",  
-    "torch>=2.5.1"
     ]
 build-backend = "setuptools.build_meta"
 
@@ -17,6 +16,30 @@ damply = ">=0.10.0, <0.11"
 med-imagetools = ">=2.12.0, <3"
 
 [tool.pixi.tasks]
+[tool.pixi.tasks.predict-medsam2]
+args = ["dataset", "disease_region"]
+cmd = ["python3", "medsam2_infer_CT_lesion_npz_recist.py",
+       "--imgs_path", "data/procdata/{{ disease_region }}/{{ dataset }}/images/npz_{{ dataset }}",
+       "--pred_save_dir", "data/results/{{ disease_region }}/{{ dataset }}/predictions/medsam2"]
+
+[tool.pixi.tasks.predict-eff-small]
+args = ["dataset", "disease_region"]
+cmd = ["python3", "eff_medsam2_infer_CT_lesion_npz_recist_local.py",
+       "--checkpoint", "small",
+       "--imgs_path", "data/procdata/{{ disease_region }}/{{ dataset }}/images/npz_{{ annotation_type }}_{{ dataset }}",
+       "--pred_save_dir", "data/results/{{ disease_region }}/{{ dataset }}/predictions/eff-small-{{ annotation_type }}",
+       "--save_overlay",
+       "--num_workers", "{{ num_workers }}"]
+
+[tool.pixi.tasks.predict-eff-tiny]
+args = ["dataset", "disease_region", "num_workers", {arg = "annotation_type", default = "RERECIST"}]
+cmd = ["python3", "eff_medsam2_infer_CT_lesion_npz_recist_local.py",
+       "--checkpoint", "tiny",
+       "--imgs_path", "data/procdata/{{ disease_region }}/TCIA_{{ dataset }}/images/npz_{{ annotation_type }}_{{ dataset }}",
+       "--pred_save_dir", "data/results/{{ disease_region }}/TCIA_{{ dataset }}/predictions/eff-tiny-{{ annotation_type }}",
+       "--save_overlay",
+       "--num_workers", "{{ num_workers }}"]
+
 
 [tool.pixi.dependencies]
 matplotlib = ">=3.10.7,<4"

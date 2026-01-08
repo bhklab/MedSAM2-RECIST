@@ -148,6 +148,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libgcc-15.2.0-h767d61c_7.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libgcc-ng-15.2.0-h69a702a_7.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libgfortran-15.2.0-h69a702a_7.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/libgfortran-ng-15.2.0-h69a702a_7.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libgfortran5-15.2.0-hcd61629_7.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libgl-1.7.0-ha4b6fd6_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libglib-2.86.1-h32235b2_2.conda
@@ -1269,7 +1270,6 @@ packages:
   - python >=3.11,<3.12.0a0
   - python_abi 3.11.* *_cp311
   license: LGPL-3.0-or-later
-  license_family: LGPL
   purls:
   - pkg:pypi/gmpy2?source=hash-mapping
   size: 202878
@@ -2399,6 +2399,16 @@ packages:
   purls: []
   size: 29275
   timestamp: 1759968110483
+- conda: https://conda.anaconda.org/conda-forge/linux-64/libgfortran-ng-15.2.0-h69a702a_7.conda
+  sha256: 63e1d1ce309e3f42a11637ecf0f29b5cf1550ca6d46412edf82e8e249b1917a1
+  md5: beeb74a6fe5ff118451cf0581bfe2642
+  depends:
+  - libgfortran 15.2.0 h69a702a_7
+  license: GPL-3.0-only WITH GCC-exception-3.1
+  license_family: GPL
+  purls: []
+  size: 29330
+  timestamp: 1759968394141
 - conda: https://conda.anaconda.org/conda-forge/linux-64/libgfortran5-15.2.0-hcd61629_7.conda
   sha256: e93ceda56498d98c9f94fedec3e2d00f717cbedfc97c49be0e5a5828802f2d34
   md5: f116940d825ffc9104400f0d7f1a4551
@@ -3861,14 +3871,15 @@ packages:
   - pkg:pypi/pure-eval?source=hash-mapping
   size: 16668
   timestamp: 1733569518868
-- conda: https://conda.anaconda.org/conda-forge/noarch/pybind11-2.13.6-pyhc790b64_3.conda
-  sha256: d429f6f255fbe49f09b9ae1377aa8cbc4d9285b8b220c17ae2ad9c4894c91317
-  md5: 1594696beebf1ecb6d29a1136f859a74
+- conda: https://conda.anaconda.org/conda-forge/noarch/pybind11-3.0.1-pyh7a1b43c_0.conda
+  sha256: 2558727093f13d4c30e124724566d16badd7de532fd8ee7483628977117d02be
+  md5: 70ece62498c769280f791e836ac53fff
   depends:
-  - pybind11-global 2.13.6 *_3
-  - python >=3.9
+  - python >=3.8
+  - pybind11-global ==3.0.1 *_0
+  - python
   constrains:
-  - pybind11-abi ==4
+  - pybind11-abi ==11
   license: BSD-3-Clause
   license_family: BSD
   purls:
@@ -3879,10 +3890,11 @@ packages:
   sha256: c044cfcbe6ef0062d0960e9f9f0de5f8818cec84ed901219ff9994b9a9e57237
   md5: 730a5284e26d6bdb73332dafb26aec82
   depends:
+  - python >=3.8
   - __unix
-  - python >=3.9
+  - python
   constrains:
-  - pybind11-abi ==4
+  - pybind11-abi ==11
   license: BSD-3-Clause
   license_family: BSD
   purls:
@@ -4473,7 +4485,6 @@ packages:
   constrains:
   - __glibc >=2.17
   license: MIT
-  license_family: MIT
   purls:
   - pkg:pypi/rpds-py?source=hash-mapping
   size: 384323
