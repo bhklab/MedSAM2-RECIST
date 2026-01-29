@@ -12,3 +12,6 @@ outputs/*
 checkpoints/*.pt
 *.pt
 *.npz
+
+# Paths 
+data/*
