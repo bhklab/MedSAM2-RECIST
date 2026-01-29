@@ -605,7 +605,8 @@ def pos_neg_true_visual(image,
                 mpatches.Patch(color = 'green', label = 'False Positive'), 
                 mpatches.Patch(color = 'blue', label = 'True Positive')]
     counter = 0
-    for i in slices_to_plot: 
+    for i in slices_to_plot:
+    
         axes[counter].imshow(image[i], cmap = 'gray') 
         axes[counter].imshow(comb_masks[i], cmap = cmap, norm = norm, interpolation = 'nearest', alpha = 0.6)
         axes[counter].axis("off")
@@ -766,21 +767,29 @@ def plot_density(gt_mask: np.ndarray,
 
     # Combine dataframes into one for plotting
     all_data = pd.concat([gt_data, pred_data], axis = 0).reset_index(drop = True)
+    # Check if the data has NaNs and if so, return and don't make the graph (it'll return an error otherwise)
+    if all_data.isnull().values.any(): 
+        print(f"NaNs present in the histogram data dataframe for: {full_savepath}. Cannot create density plot.")
+        return 0
 
     # Create figure 
-    plot = sns.displot(data = all_data, 
+    try:
+        plot = sns.displot(data = all_data, 
                 x = "slice_num", 
                 weights = "pix_count", 
                 hue = "Mask Type",
                 kind = "kde", 
                 fill = True
                 )
-    plot.set(xlim=(0, gt_mask.shape[0]), xlabel = "Slice Number")
+        plot.set(xlim=(0, gt_mask.shape[0]), xlabel = "Slice Number")
 
-    plt.figtext(0.5, -0.05, "Prompt: " + prompt, ha='center', va='top')
+        plt.figtext(0.5, -0.05, "Prompt: " + str(prompt), ha='center', va='top')
 
-    # Save figure
-    plt.savefig(full_savepath, bbox_inches = 'tight')
+        # Save figure
+        plt.savefig(full_savepath, bbox_inches = 'tight')
+    except ValueError:
+        print(f"NaNs present during the calculation of density for: {full_savepath}. Cannot create density plot.")
+        return 0
 
 def calc_metrics(pred_mask: np.ndarray, 
                  gt_mask: np.ndarray, 
@@ -1092,9 +1101,9 @@ def run_infer_metric_vis(img_path: Path,
                               window_width = win_width)
     
     # Get appropriate save path for the images and visualizations (if applicable)
-    base_savepath = Path("data/results") / disease_loc / "/".join(gts_path.split("/")[:-1]).replace("images", "predictions")
-    mask_name = gts_path.split("/")[-1]
-    image_savepath = Path("data/results") / disease_loc / gts_path.replace(".nii.gz", "_pred.nii.gz")
+    base_savepath = Path("data/results") / disease_loc / "/".join(gts_path.split("/")[:-1]).replace("images", "predictions_MS2R")
+    mask_name = gts_path.split("/")[-1].replace(".nii.gz", "_pred.nii.gz")
+    image_savepath = base_savepath / mask_name
     visual_savepath = base_savepath / 'visualization'
 
     # Run inference 
@@ -1104,12 +1113,21 @@ def run_infer_metric_vis(img_path: Path,
                                    spacing = img.GetSpacing(), 
                                    recist_coords = recist_coords, 
                                    slice_num = slice_num)
+
+    # Save predicted segmentation 
+    pred_seg_img = sitk.GetImageFromArray(pred_seg)
+    pred_seg_img.SetSpacing(img.GetSpacing())
+    pred_seg_img.SetOrigin(img.GetOrigin())
+    pred_seg_img.SetDirection(img.GetDirection())
+
+    sitk.WriteImage(pred_seg_img, image_savepath) 
+    
     # Calculate metrics 
     metrics_df = calc_metrics(pred_mask = pred_seg, 
                               gt_mask = gts_array, 
                               spacing = img.GetSpacing(), 
                               filename = base_savepath)
-    durations = pd.DataFrame({'image': str(img_path), 
+    durations = pd.DataFrame({'image': str(gts_path), 
                             'duration': infer_dur}, index = [0])
     
     # Export visualizations (if applicable) 
@@ -1173,7 +1191,7 @@ if __name__ == '__main__':
              ) for _, row in tqdm(index_df.iterrows(), total = index_df.shape[0])))
 
     # Save all evaluation results 
-    out_path = Path("data/results") / disease_location / "/".join(index_df['image_path'].iloc[0].replace("images", "predictions").split("/")[:3])
+    out_path = Path("data/results") / disease_location / "/".join(index_df['image_path'].iloc[0].replace("images", "predictions_MS2R").split("/")[:3])
     if not out_path.exists(): 
         out_path.mkdir(parents = True, exist_ok = True)
 
