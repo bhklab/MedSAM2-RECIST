@@ -2,6 +2,10 @@ import SimpleITK as sitk
 import numpy as np
 from pathlib import Path
 import pandas as pd
+from skimage.draw import line
+from joblib import Parallel, delayed
+import click
+from tqdm import tqdm
 
 
 def apply_windowing(img_array: np.ndarray,
@@ -141,13 +145,47 @@ def mask3D_to_bbox(gt3D:np.array,
     return boxes3D.astype(int)
 
 
+def get_line_from_recist(recist_coords: np.array, 
+                         slice_number: int, 
+                         img_size: np.array):
+    '''
+    From the RECIST measurement coordinates, generate a line connecting both coordinates on the correct slice and return an np.ndarray the same shape as the image.
+    Output to be compatible with the ['recist'] array of the .npz files needed for MedSAM2-RECIST.
+
+    Parameters
+    ----------
+    recist_coords: array
+        A list of coordinates in [x1, y1, x2, y2] format that defines the RECIST measurement 
+    slice_number: int
+        The slice that the measurement was taken on
+    img_size: np.array
+        The x, y, and z size of the image in [z_space, x_space, y_space] format
+    
+    Returns
+    ----------
+    recist_arr: np.ndarray
+        A binary array of the same shape as the image with the pixels of the line = 1
+    '''
+    #Generate an array in the same size as the image filled with all zeros 
+    recist_arr = np.zeros((img_size[0], img_size[1], img_size[2]), dtype = int)
+    
+    #Round the coordinate values to their nearest integers 
+    coords_round = np.rint(recist_coords).astype(int)
+
+    #Draw line using coordinates 
+    rr, cc = line(coords_round[0], coords_round[1], coords_round[2], coords_round[3])
+
+    #Put line into the correct slice in the RECIST array of all zeros 
+    recist_arr[slice_number][cc, rr] = 1
+
+    return recist_arr
+
 
 def nifti_to_medsam_npz(image_path: Path,
                         mask_path: Path,
                         npz_path: Path,
-                        # recist_path: Path | None = None,
-                        window_level: int = 40,
-                        window_width: int = 400) -> None:
+                        window_level: int = 0,
+                        window_width: int = -1) -> None:
     '''
     Convert a NIfTI image to a NumPy NPZ file after applying windowing.
 
@@ -167,32 +205,43 @@ def nifti_to_medsam_npz(image_path: Path,
         Window width for image windowing (default is 400).
     '''
     # Load NIfTI image using SimpleITK
-    nifti_image = sitk.ReadImage(image_path)
+    nifti_image = sitk.ReadImage(image_path, outputPixelType=sitk.sitkInt16)
     image_array = sitk.GetArrayFromImage(nifti_image)
 
     # Apply windowing to the image only
-    windowed_img = apply_windowing(image_array, window_level, window_width)
+    if window_width != -1:
+        image_array = apply_windowing(image_array, window_level, window_width)
+    
+    spacing = nifti_image.GetSpacing()
+    direction = nifti_image.GetDirection()
+    origin = nifti_image.GetOrigin()
 
     # Load NIfTI mask using SimpleITK
-    nifti_mask = sitk.ReadImage(mask_path)
+    nifti_mask = sitk.ReadImage(mask_path, outputPixelType=sitk.sitkUInt8)
     mask_array = sitk.GetArrayFromImage(nifti_mask)
 
     # Make RECIST annotation part of the input 
     # First make a 3D bounding box
     x_min, y_min, z_min, x_max, y_max, z_max = mask3D_to_bbox(mask_array, mask_path)
-    # Get the axial bounding box from this
-    bbox_2d = [x_min, y_min, x_max, y_max]
     # Get the z-axis coordinate for the middle slice
     z_mid = (z_min + z_max) // 2
 
-    # TODO: draw RECIST line on the mid slice and save as part of the NPZ file
+    # make an empty 2D array for the mid slice
+    rerecist_arr = get_line_from_recist(np.array([x_min, y_min, x_max, y_max]),
+                                        slice_number=z_mid,
+                                        img_size=image_array.shape)
 
-
-
-
-
+    npz_path.parent.mkdir(parents=True, exist_ok=True)
     # Save as NPZ file
-    np.savez_compressed(npz_path, image=windowed_img)
+    np.savez_compressed(npz_path, 
+                        imgs=image_array,
+                        gts=mask_array,
+                        recist=rerecist_arr,
+                        spacing=spacing,
+                        direction=direction,
+                        origin=origin)
+
+    return rerecist_arr
 
 
 
@@ -218,26 +267,103 @@ def insert_SampleID(dataset_index:pd.DataFrame) -> pd.DataFrame:
     return dataset_index
 
 
+def process_one_sample(sample_metadata: str,
+                       image_path: Path,
+                       out_path: Path,
+                       window_level: int = 0,
+                       window_width: int = -1
+                       ):
+    sample_id = sample_metadata['SampleID'].iloc[0]
+    
+    img_metadata = sample_metadata[sample_metadata['class'] == 'Scan']
+    if img_metadata.empty:
+        print(f"{sample_id} has no Scan metadata. Skipping sample.")
+        return
+    
+    mask_metadata = sample_metadata[sample_metadata['class'] == 'Mask']
+    if mask_metadata.empty:
+        print(f"{sample_id} has no Mask metadata. Skipping sample.")
+        return
+    for idx, mask in mask_metadata.iterrows():
+        mask_path = image_path / mask['filepath']
+        rtstruct_id = Path(mask_path).parent.stem
 
+        nifti_to_medsam_npz(image_path = image_path / img_metadata['filepath'].values[0],
+                            mask_path = mask_path,
+                            npz_path = out_path / f"{sample_id}_{rtstruct_id}.npz",
+                            window_level = window_level,
+                            window_width = window_width)
+
+
+
+@click.command()
+@click.argument('image_path', type=click.Path(exists=True, readable=True))
+@click.argument('out_path', type=click.Path())
+@click.option('--window_level', type=click.INT, default = 0, help="Level to use if windowing is to be applied to the images.")
+@click.option('--window_width', type=click.INT, default = -1, help="Width to use if windowing is to be applied to the images. If set to -1, no windowing will be applied.")
+@click.option('--parallel', type=click.BOOL, default = False, help="Whether to run the conversion in parallel.")
 def process_mit_images(image_path: Path,
-                       window_level: int = 40,
-                       window_width: int = 400) -> None:
+                       out_path: Path,
+                       window_level: int = 0,
+                       window_width: int = -1,
+                       parallel: bool = False):
+    """Process images in a Med-ImageTools autopipeline index-simple file to convert to npz
+    Parameters
+    ----------
+    image_path: Path
+        Path to directory containing MIT index and sample directories 
+    out_path: Path
+        Path to save the npz files to.
+    window_level: int = 0
+        Level to use if windowing is to be applied to the images.
+    window_width: int = -1
+        Width to use if windowing is to be applied to the images. If set to -1, no windowing will be applied.
+    parallel: bool = False
+        Whether to run the image conversion in parallel.
+    """
+    if isinstance(image_path, str):
+        image_path = Path(image_path)
+
+    if isinstance(out_path, str):
+        out_path = Path(out_path)
+
     # load mit index file
     mit_index_df = pd.read_csv(image_path / f"{image_path.stem}_index-simple.csv")
 
     if 'SampleID' not in mit_index_df.columns:
         mit_index_df = insert_SampleID(mit_index_df)
 
-    sample_ids = sorted(mit_index_df['SampleID'].tolist())
+    sample_ids = sorted(mit_index_df['SampleID'].unique())
 
-    for sample_id in sample_ids:
-        images_metadata = mit_index_df[mit_index_df['SampleID'] == sample_id]
+    if parallel:
+        Parallel()(
+            delayed(process_one_sample)(
+                sample_metadata=mit_index_df[mit_index_df['SampleID'] == sample_id],
+                image_path=image_path,
+                out_path=out_path,
+                window_level=window_level,
+                window_width=window_width
+            )
+            for sample_id in tqdm(
+                sample_ids,
+                desc="Converting nifti to npz for MedSAM2-RECIST inference",
+                total=len(sample_ids)
+            )
+        )
 
-        image = sitk.Read
+    else:
+        for sample_id in tqdm(
+            sample_ids,
+            desc="Converting nifti to npz for MedSAM2-RECIST inference",
+            total=len(sample_ids)
+        ):
+            process_one_sample(sample_metadata=mit_index_df[mit_index_df['SampleID'] == sample_id],
+                               image_path=image_path,
+                               out_path=out_path,
+                               window_level=window_level,
+                               window_width=window_width)
 
-
-    return None
 
 
 if __name__ == "__main__":
-    process_mit_images(Path("data/rawdata/TCIA_RADCURE/images/mit_RADCURE_OCSCC"))
+    process_mit_images()
